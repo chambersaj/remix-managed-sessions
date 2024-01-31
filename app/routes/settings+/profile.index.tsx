@@ -16,6 +16,7 @@ import {
 	invariantResponse,
 	useDoubleCheck,
 } from '#app/utils/misc.tsx'
+import { getSession } from '#app/utils/session.server.ts'
 import {
 	EmailSchema,
 	NameSchema,
@@ -40,6 +41,11 @@ export async function loader({ request }: DataFunctionArgs) {
 			image: {
 				select: { id: true },
 			},
+			_count: { select: { sessions: true } },
+			// 🐨 add a count of the number of sessions for this user
+			// 📜 https://www.prisma.io/docs/reference/api-reference/prisma-client-reference#select-a-_count-of-relations
+			// 💰 also only select those which have not yet expired!
+			// 📜 https://www.prisma.io/docs/reference/api-reference/prisma-client-reference#gt
 		},
 	})
 
@@ -54,6 +60,7 @@ type ProfileActionArgs = {
 	formData: FormData
 }
 const profileUpdateActionIntent = 'update-profile'
+const signOutOfSessionsActionIntent = 'sign-out-of-sessions'
 const deleteDataActionIntent = 'delete-data'
 
 export async function action({ request }: DataFunctionArgs) {
@@ -64,6 +71,9 @@ export async function action({ request }: DataFunctionArgs) {
 	switch (intent) {
 		case profileUpdateActionIntent: {
 			return profileUpdateAction({ request, userId, formData })
+		}
+		case signOutOfSessionsActionIntent: {
+			return signOutOfSessionsAction({ request, userId, formData })
 		}
 		case deleteDataActionIntent: {
 			return deleteDataAction({ request, userId, formData })
@@ -119,6 +129,7 @@ export default function EditUserProfile() {
 						<Icon name="download">Download your data</Icon>
 					</a>
 				</div>
+				<SignOutOfSessions />
 				<DeleteData />
 			</div>
 		</div>
@@ -239,6 +250,55 @@ function UpdateProfile() {
 				</StatusButton>
 			</div>
 		</fetcher.Form>
+	)
+}
+
+async function signOutOfSessionsAction({ request, userId }: ProfileActionArgs) {
+	// 🐨 get the sessionId from the cookieSession (you'll need to use getSession for this)
+	const sessionId = (await getSession(request.headers.get('cookie'))).get('id')
+	// 🐨 delete all the sessions that are not the current session
+	await prisma.session.deleteMany({ where: { id: { not: sessionId } } })
+	// 📜 https://www.prisma.io/docs/reference/api-reference/prisma-client-reference#not
+	return json({ status: 'success' } as const)
+}
+
+function SignOutOfSessions() {
+	// 🐨 get the loader data using useLoaderData
+	const data = useLoaderData<typeof loader>()
+	const dc = useDoubleCheck()
+
+	const fetcher = useFetcher<typeof signOutOfSessionsAction>()
+	const otherSessionsCount = data.user._count.sessions - 1 // 🐨 this should be the count of sessions minus 1
+
+	return (
+		<div>
+			{otherSessionsCount ? (
+				<fetcher.Form method="POST">
+					<AuthenticityTokenInput />
+					<StatusButton
+						{...dc.getButtonProps({
+							type: 'submit',
+							name: 'intent',
+							value: signOutOfSessionsActionIntent,
+						})}
+						variant={dc.doubleCheck ? 'destructive' : 'default'}
+						status={
+							fetcher.state !== 'idle'
+								? 'pending'
+								: fetcher.data?.status ?? 'idle'
+						}
+					>
+						<Icon name="avatar">
+							{dc.doubleCheck
+								? `Are you sure?`
+								: `Sign out of ${otherSessionsCount} other sessions`}
+						</Icon>
+					</StatusButton>
+				</fetcher.Form>
+			) : (
+				<Icon name="avatar">This is your only session</Icon>
+			)}
+		</div>
 	)
 }
 

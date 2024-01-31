@@ -32,3 +32,4 @@ tsconfig.tsbuildinfo
 # generated on the fly for the workshop
 # We're not changing these duing the workshop anyway
 # /app/components/ui/icons
+prisma/data.db

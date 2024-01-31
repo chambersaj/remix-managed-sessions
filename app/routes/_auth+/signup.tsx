@@ -18,7 +18,7 @@ import {
 	getSessionExpirationDate,
 	requireAnonymous,
 	signup,
-	userIdKey,
+	sessionKey,
 } from '#app/utils/auth.server.ts'
 import { validateCSRF } from '#app/utils/csrf.server.ts'
 import { prisma } from '#app/utils/db.server.ts'
@@ -104,7 +104,7 @@ export async function action({ request }: DataFunctionArgs) {
 		request.headers.get('cookie'),
 	)
 	// 🐨 this is a sessionKey and session, not a userIdKey and user
-	cookieSession.set(userIdKey, user.id)
+	cookieSession.set(sessionKey, user.id)
 
 	return redirect(safeRedirect(redirectTo), {
 		headers: {
