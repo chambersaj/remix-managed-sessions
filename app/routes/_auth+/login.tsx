@@ -19,12 +19,11 @@ import {
 	getSessionExpirationDate,
 	login,
 	requireAnonymous,
-	userIdKey,
 } from '#app/utils/auth.server.ts'
 import { validateCSRF } from '#app/utils/csrf.server.ts'
 import { checkHoneypot } from '#app/utils/honeypot.server.ts'
 import { useIsPending } from '#app/utils/misc.tsx'
-import { sessionStorage } from '#app/utils/session.server.ts'
+import { commitSession, getSession } from '#app/utils/session.server.ts'
 import { PasswordSchema, UsernameSchema } from '#app/utils/user-validation.ts'
 
 const LoginFormSchema = z.object({
@@ -81,17 +80,12 @@ export async function action({ request }: DataFunctionArgs) {
 	// 🐨 this is a session, not a user
 	const { user, remember, redirectTo } = submission.value
 
-	const cookieSession = await sessionStorage.getSession(
-		request.headers.get('cookie'),
-	)
-	// 🐨 this is the sessionKey and a session, not userIdKey and user
-	cookieSession.set(userIdKey, user.id)
+	const cookieSession = await getSession(request.headers.get('cookie'))
+	cookieSession.set('userId', user.id)
 
 	return redirect(safeRedirect(redirectTo), {
 		headers: {
-			'set-cookie': await sessionStorage.commitSession(cookieSession, {
-				// 🐨 the expiration date is now available on the session and doesn't
-				// need to be computed here.
+			'set-cookie': await commitSession(cookieSession, {
 				expires: remember ? getSessionExpirationDate() : undefined,
 			}),
 		},
