@@ -22,7 +22,6 @@ import {
 	NameSchema,
 	UsernameSchema,
 } from '#app/utils/user-validation.ts'
-import { getSession } from '#app/utils/session.server.ts'
 
 const ProfileFormSchema = z.object({
 	name: NameSchema.optional(),
